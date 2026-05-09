@@ -6,15 +6,21 @@ import { currentUser } from "@clerk/nextjs/server";
 import { CalendarDays } from "lucide-react";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 const MyAppointmentPage = async () => {
   const user = await currentUser();
   if (!user) redirect("/");
 
   const appointments = await getIntervieweeAppointments();
   const now = new Date();
+  
+  // A session is upcoming if it's still scheduled and hasn't ended yet
   const scheduled = appointments.filter(
-    (a) => a.status === "SCHEDULED" && new Date(a.startTime) > now,
+    (a) => a.status === "SCHEDULED" && new Date(a.endTime) > now,
   );
+  
+  // A session is past if it's completed, cancelled, or the end time has passed
   const past = appointments.filter(
     (a) => a.status !== "SCHEDULED" || new Date(a.endTime) <= now,
   );
