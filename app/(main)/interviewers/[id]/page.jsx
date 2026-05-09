@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CATEGORY_LABEL, EXPECT_ITEMS } from "@/lib/data";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import React from "react";
 import SlotPicker from "./_components/SlotPicker";
 import { getCurrentUser } from "@/actions/user";

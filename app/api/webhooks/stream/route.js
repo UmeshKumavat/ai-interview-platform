@@ -46,15 +46,13 @@ export async function POST(request) {
       const recordingUrl = body.call_recording?.url;
 
       if (!recordingUrl) {
-        console.log(
-          `[stream-webhook] call.recording_ready received but no URL in payload`,
-        );
         return Response.json({ ok: true });
       }
 
       await db.booking.update({
         where: { id: booking.id },
-        data: { recordingUrl },
+        // Backup: set status COMPLETED here too in case transcription fails
+        data: { recordingUrl, status: "COMPLETED" },
       });
 
       return Response.json({ ok: true });
@@ -62,62 +60,92 @@ export async function POST(request) {
 
     // ── Transcription ready ───────────────────────────────────────────────────
     if (eventType === "call.transcription_ready") {
-      // Outer guard — catches sequential retries
-      if (booking.feedback) {
-        console.log(
-          `[stream-webhook] Feedback already exists for booking ${booking.id}, skipping duplicate webhook`,
-        );
-        return Response.json({ ok: true });
+      console.log(`[stream-webhook] ⚡ Processing transcription for booking ${booking.id}...`);
+
+      // 1. Mark as COMPLETED immediately
+      await db.booking.update({
+        where: { id: booking.id },
+        data: { status: "COMPLETED" },
+      });
+
+      // 2. Handle credit earning
+      const earnExists = await db.creditTransaction.findFirst({
+        where: { bookingId: booking.id, type: "BOOKING_EARNING" },
+      });
+
+      if (!earnExists) {
+        console.log(`[stream-webhook] 💰 Allocating credits to interviewer...`);
+        await db.creditTransaction.create({
+          data: {
+            userId: booking.interviewer.id,
+            amount: booking.creditsCharged,
+            type: "BOOKING_EARNING",
+            bookingId: booking.id,
+          },
+        });
       }
+
+      // 3. Process Transcription & AI Feedback
       const transcriptUrl = body.call_transcription?.url;
       if (!transcriptUrl) {
+        console.log(`[stream-webhook] ⚠ No transcript URL found in payload.`);
         return Response.json({ ok: true });
       }
 
-      // 1. Download JSONL from Stream CDN
-
-      const transcriptRes = await fetch(transcriptUrl);
-      const transcriptText = await transcriptRes.text();
-
-      // 2. Parse JSONL into readable conversation
-      const lines = transcriptText
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => {
-          try {
-            return JSON.parse(line);
-          } catch {
-            return null;
-          }
-        })
-        .filter((entry) => entry?.type === "speech");
-
-      if (lines.length === 0) {
+      if (booking.feedback) {
+        console.log(`[stream-webhook] ℹ Feedback already exists, skipping AI analysis.`);
         return Response.json({ ok: true });
       }
+
+      try {
+        console.log(`[stream-webhook] 📥 Downloading transcript from: ${transcriptUrl}`);
+        const transcriptRes = await fetch(transcriptUrl);
+        const transcriptText = await transcriptRes.text();
+
+        console.log(`[stream-webhook] 🔍 Parsing transcript lines...`);
+        const lines = transcriptText
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => {
+            try {
+              return JSON.parse(line);
+            } catch {
+              return null;
+            }
+          })
+          .filter((entry) => entry?.text && entry?.speaker_id); // More inclusive filter
+
+        console.log(`[stream-webhook] 📝 Found ${lines.length} speech segments.`);
+
+        if (lines.length === 0) {
+          console.log(`[stream-webhook] ∅ Transcript is empty, skipping AI analysis.`);
+          return Response.json({ ok: true });
+        }
 
       // Map clerkUserId to display name
-      const speakerMap = {
-        [booking.interviewer.clerkUserId]:
-          booking.interviewer.name ?? "Interviewer",
-        [booking.interviewee.clerkUserId]:
-          booking.interviewee.name ?? "Interviewee",
-      };
+        const speakerMap = {
+          [booking.interviewer.clerkUserId]:
+            booking.interviewer.name ?? "Interviewer",
+          [booking.interviewee.clerkUserId]:
+            booking.interviewee.name ?? "Interviewee",
+        };
 
-      const transcript = lines
-        .map((l) => `${speakerMap[l.speaker_id] ?? l.speaker_id}: ${l.text}`)
-        .join("\n");
+        const transcript = lines
+          .map((l) => `${speakerMap[l.speaker_id] ?? l.speaker_id}: ${l.text}`)
+          .join("\n");
 
       // 3. Generate feedback via Gemini
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-      });
-      const categories =
-        booking.interviewer.categories?.join(", ") ?? "General";
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        
+        
+        const model = genAI.getGenerativeModel(
+          { model: "gemini-2.5-flash-lite" }
+        );
+        const categories =
+          booking.interviewer.categories?.join(", ") ?? "General";
 
-      const prompt = `You are an expert technical interviewer evaluating a mock interview.
+        const prompt = `You are an expert technical interviewer evaluating a mock interview.
 
 Interview categories: ${categories}
 Interviewer: ${booking.interviewer.name}
@@ -138,18 +166,19 @@ Analyze the candidate's performance. Respond ONLY with a valid JSON object, no m
   "overallRating": "POOR or AVERAGE or GOOD or EXCELLENT"
 }`;
 
-      const result = await model.generateContent(prompt);
-      const raw = result.response
-        .text()
-        .trim()
-        .replace(/^```json|^```|```$/gm, "")
-        .trim();
+        const result = await model.generateContent(prompt);
+        const raw = result.response
+          .text()
+          .trim()
+          .replace(/^```json|^```|```$/gm, "")
+          .trim();
 
-      const feedbackData = JSON.parse(raw);
+        console.log(`[stream-webhook] ✅ AI analysis received. Parsing JSON...`);
+        const feedbackData = JSON.parse(raw);
 
       // 4. Write to DB — upsert handles concurrent webhook retries cleanly (no P2002)
-      await db.$transaction([
-        db.feedback.upsert({
+
+        await db.feedback.upsert({
           where: { bookingId: booking.id },
           create: {
             bookingId: booking.id,
@@ -162,35 +191,17 @@ Analyze the candidate's performance. Respond ONLY with a valid JSON object, no m
             improvements: feedbackData.improvements,
             overallRating: feedbackData.overallRating,
           },
-          update: {}, // already exists — no-op, keep the original
-        }),
-        db.booking.update({
-          where: { id: booking.id },
-          data: { status: "COMPLETED" },
-        }),
-      ]);
-
-      // Credit transaction is outside the main transaction so we can check first
-      const earnExists = await db.creditTransaction.findFirst({
-        where: { bookingId: booking.id, type: "BOOKING_EARNING" },
-      });
-
-      if (!earnExists) {
-        await db.creditTransaction.create({
-          data: {
-            userId: booking.interviewer.id,
-            amount: booking.creditsCharged,
-            type: "BOOKING_EARNING",
-            bookingId: booking.id,
-          },
+          update: {},
         });
+        console.log(`[stream-webhook] ✨ Feedback successfully saved to database.`);
+      } catch (aiError) {
+        console.error("[stream-webhook] ✗ AI Analysis failed:", aiError.message);
       }
     }
 
     return Response.json({ ok: true });
   } catch (error) {
-    console.error(`[stream-webhook] ✗ ${eventType} error:`, error);
-    // Always 200 — non-2xx triggers Stream retries, making the race worse
+    console.error(`[stream-webhook] ✗ Critical error during ${eventType}:`, error);
     return Response.json({ ok: true });
   }
 }
