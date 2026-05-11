@@ -35,7 +35,7 @@ export const getInterViewers = async () => {
 
     return interviewers;
   } catch (error) {
-    console.error("getInterviewers error:", err);
+    console.error("getInterviewers error:", error);
     return [];
   }
 };

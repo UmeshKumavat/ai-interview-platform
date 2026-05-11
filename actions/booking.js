@@ -41,8 +41,8 @@ export const getInterviewerProfile = async (interviewerId) => {
     });
 
     return interviewer ?? null;
-  } catch (err) {
-    console.error("getInterviewerProfile error:", err);
+  } catch (error) {
+    console.error("getInterviewerProfile error:", error);
     throw new Error("Failed to fetch interviewer profile");
   }
 };
@@ -177,7 +177,7 @@ export const bookSlot = async ({ interviewerId, startTime, endTime }) => {
 
     return { success: true, bookingId: booking.id, streamCallId };
   } catch (error) {
-    console.error("bookSlot transaction failed:", err);
+    console.error("bookSlot transaction failed:", error);
     throw new Error("Booking failed. Please try again.");
   }
 };
