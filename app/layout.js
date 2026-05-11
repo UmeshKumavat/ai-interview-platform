@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { Toaster } from "sonner";
 
 const lora = Lora({
@@ -46,9 +47,7 @@ export default function RootLayout({ children }) {
             <Toaster richColors/>
             
             {/* Footer  */}
-            <footer className="relative z-10 border-t border-white/7 py-12  mx-auto px-6 flex flex-wrap items-center justify-center text-stone-400">
-              Made with ❤️ by Umesh
-            </footer>
+            <Footer />
           </ThemeProvider>
         </body>
       </html>

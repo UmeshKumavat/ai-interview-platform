@@ -121,9 +121,10 @@ const FeedbackModal = ({ open, onOpenChange, feedback, intervieweeName }) => {
                   <Badge
                     key={i}
                     variant="outline"
-                    className="justify-start border-green-500/20 text-green-400 whitespace-normal"
+                    className="flex justify-start h-auto py-2 px-3 border-green-500/20 text-green-400 whitespace-normal text-left leading-relaxed"
                   >
-                    ✓ {s}
+                    <span className="shrink-0 mr-2">✓</span>
+                    {s}
                   </Badge>
                 ))}
               </div>
@@ -142,9 +143,10 @@ const FeedbackModal = ({ open, onOpenChange, feedback, intervieweeName }) => {
                   <Badge
                     key={i}
                     variant="outline"
-                    className="justify-start border-red-500/20 text-red-400 whitespace-normal"
+                    className="flex justify-start h-auto py-2 px-3 border-red-500/20 text-red-400 whitespace-normal text-left leading-relaxed"
                   >
-                    ✓ {imp}
+                    <span className="shrink-0 mr-2">!</span>
+                    {imp}
                   </Badge>
                 ))}
               </div>
