@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AI_TAGS, AVATARS, LOGOS, ROLES, SLOTS } from "@/lib/data";
 import { PricingTable } from "@clerk/nextjs";
-import { Bot, Wallet } from "lucide-react";
+import { Bot, Wallet, Video, MessageSquare, ShieldCheck, BarChart3, CalendarRange } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -190,7 +190,7 @@ export default function Home() {
 
           <div className="col-span-12 md:col-span-4">
             <BentoCard
-              icon="📹"
+              icon={<Video size={18} className="text-amber-400" />}
               title="HD Video Calls"
               desc="Powered by Stream. Screen sharing, recording, and instant playback links — all built in."
             >
@@ -200,7 +200,7 @@ export default function Home() {
 
           <div className="col-span-12 md:col-span-4">
             <BentoCard
-              icon="💬"
+              icon={<MessageSquare size={18} className="text-amber-400" />}
               title="Persistent Chat"
               desc="Message your interviewer before and after the call. Share resources, prep notes, and follow-ups in one thread."
             />
@@ -208,7 +208,7 @@ export default function Home() {
 
           <div className="col-span-12 md:col-span-4">
             <BentoCard
-              icon="🔒"
+              icon={<ShieldCheck size={18} className="text-amber-400" />}
               title="Security by Arcjet"
               desc="Bot protection, rate limiting, and abuse prevention baked into every API route."
             />
@@ -216,7 +216,7 @@ export default function Home() {
 
           <div className="col-span-12 md:col-span-6">
             <BentoCard
-              icon="📊"
+              icon={<BarChart3 size={18} className="text-amber-400" />}
               title={<GrayTitle>AI Feedback Reports</GrayTitle>}
               desc="Post-interview analysis by Gemini with actionable insights."
             >
@@ -226,7 +226,7 @@ export default function Home() {
 
           <div className="col-span-12 md:col-span-6">
             <BentoCard
-              icon="🗓️"
+              icon={<CalendarRange size={18} className="text-amber-400" />}
               title={<GoldTitle>Slot-based Scheduling</GoldTitle>}
               desc="Interviewers set availability once. Interviewees pick from open slots and confirm with one click — no back-and-forth needed."
             >
