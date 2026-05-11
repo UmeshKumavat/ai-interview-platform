@@ -11,6 +11,7 @@ import AvailabilitySection from "./_components/AvailabilitySection";
 import EarningsSection from "./_components/EarningsSection";
 import { getCurrentUser } from "@/actions/user";
 import { ClipboardList, Clock, Wallet } from "lucide-react";
+import { redirect } from "next/navigation";
 
 const InterviewerDashboardPage = async () => {
   const user = await currentUser();
